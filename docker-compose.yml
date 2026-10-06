@@ -2,7 +2,7 @@ services:
   flip-reader:
     # Built automatically from the GitHub repo on every change (see .github/workflows/build.yml).
     # To build locally from this folder instead, comment out `image:` and uncomment `build: .`
-    image: ghcr.io/OWNER/flip-reader:latest
+    image: ghcr.io/poofmarshall/flip-reader:latest
     # build: .
     container_name: flip-reader
     restart: unless-stopped
