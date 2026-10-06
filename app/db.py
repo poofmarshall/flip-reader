@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS dismissed_topics (
     slug TEXT PRIMARY KEY,
     dismissed_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mutes (
+    id INTEGER PRIMARY KEY,
+    section_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,  -- NULL = everywhere
+    kind TEXT NOT NULL,       -- 'tag' (a Flipboard topic slug) or 'domain' (a site)
+    value TEXT NOT NULL,
+    label TEXT NOT NULL,      -- what the user sees in Settings
+    created REAL NOT NULL,
+    UNIQUE(section_id, kind, value)
+);
 """
 
 _lock = threading.RLock()
@@ -189,6 +198,29 @@ class DB:
 
     def dismiss_topic(self, slug):
         self.x("INSERT OR REPLACE INTO dismissed_topics (slug, dismissed_at) VALUES (?, ?)", (slug, time.time()))
+
+    def tags_for(self, article_ids):
+        """{article_id: [(slug, name), ...]} for the given stories."""
+        out = {}
+        ids = list(article_ids)
+        for i in range(0, len(ids), 900):  # stay under SQLite's bound-parameter limit
+            chunk = ids[i:i + 900]
+            marks = ",".join("?" * len(chunk))
+            for r in self.q(f"SELECT article_id, slug, name FROM article_tags WHERE article_id IN ({marks})", chunk):
+                out.setdefault(r["article_id"], []).append((r["slug"], r["name"]))
+        return out
+
+    # --- "fewer like this" ---
+    def mutes(self):
+        return self.q("""SELECT m.*, s.name AS section_name FROM mutes m
+                         LEFT JOIN sections s ON s.id = m.section_id ORDER BY m.created DESC""")
+
+    def add_mute(self, section_id, kind, value, label):
+        self.x("INSERT OR IGNORE INTO mutes (section_id, kind, value, label, created) VALUES (?, ?, ?, ?, ?)",
+               (section_id, kind, value, label, time.time()))
+
+    def delete_mute(self, mid):
+        self.x("DELETE FROM mutes WHERE id = ?", (mid,))
 
     def articles_needing_image(self, limit):
         return self.q(

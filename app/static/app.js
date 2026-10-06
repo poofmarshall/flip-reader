@@ -146,7 +146,10 @@ function storyCard(story, cls = "") {
   }
   const src = el("div", "src", story.source || "");
   src.append(el("span", "ago", ` · ${ago(story.published)}`));
-  c.append(src, el("h3", null, story.title));
+  const more = el("button", "more", "···");
+  more.setAttribute("aria-label", "Fewer like this");
+  more.onclick = (e) => { e.stopPropagation(); Sheet.open(story); };
+  c.append(more, src, el("h3", null, story.title));
   if (story.summary) c.append(el("p", null, story.summary));
   c.dataset.url = story.url;
   return c;
@@ -253,6 +256,14 @@ const Reader = {
   },
 
   layout() { this.setCurrent(this.cur); },
+
+  /* re-fetch the current section (after "fewer like this"); keeps the page position */
+  reload() {
+    const sid = this.sid;
+    if (!sid) return;
+    this.loadedAt[sid] = 0; this.sid = null;
+    this.open(sid);
+  },
 
   setCurrent(i) {
     this.pages.forEach((p, k) => p.classList.toggle("current", k === i));
@@ -440,6 +451,49 @@ const Reader = {
 
 $("#backBtn").onclick = () => { location.hash = "#/"; };
 
+/* =========================================================
+   "Fewer like this" sheet (the ··· button on a story)
+   ========================================================= */
+const Sheet = {
+  el: null,
+  open(story) {
+    this.close();
+    const sec = story.section_name || "this section";
+    const wrap = el("div", "sheet-wrap");
+    wrap.onclick = (e) => { if (e.target === wrap) this.close(); };
+    const sheet = el("div", "sheet");
+    sheet.append(el("div", "sheet-title", "Fewer like this"),
+                 el("div", "sheet-story", story.title));
+    const opts = [];
+    for (const t of (story.tags || []).slice(0, 5)) {
+      opts.push({ label: `Hide “${t.name}” stories in ${sec}`,
+                  body: { section_id: story.section_id, kind: "tag", value: t.slug, label: `#${t.name} stories in ${sec}` } });
+    }
+    if (story.domain) {
+      opts.push({ label: `Hide ${story.domain} in ${sec}`,
+                  body: { section_id: story.section_id, kind: "domain", value: story.domain, label: `${story.domain} in ${sec}` } });
+      opts.push({ label: `Hide ${story.domain} everywhere`,
+                  body: { section_id: null, kind: "domain", value: story.domain, label: `${story.domain} everywhere` } });
+    }
+    for (const o of opts) {
+      const b = el("button", "sheet-btn", o.label);
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await send("/api/mutes", "POST", o.body); this.close(); Reader.reload(); }
+        catch (e) { b.disabled = false; b.textContent = e.message; }
+      };
+      sheet.append(b);
+    }
+    const cancel = el("button", "sheet-btn cancel", "Cancel");
+    cancel.onclick = () => this.close();
+    sheet.append(cancel, el("p", "sheet-help", "Change your mind later under Settings → Hidden."));
+    wrap.append(sheet);
+    document.body.append(wrap);
+    this.el = wrap;
+  },
+  close() { if (this.el) { this.el.remove(); this.el = null; } },
+};
+
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
 
@@ -503,6 +557,21 @@ const Settings = {
       }
       list.append(box);
     });
+    // things hidden via "fewer like this"
+    const mutes = this.data.mutes || [];
+    $("#hiddenBox").hidden = !mutes.length;
+    const ml = $("#muteList");
+    ml.replaceChildren();
+    for (const m of mutes) {
+      const row = el("div", "feed");
+      row.append(el("div", "f-main", m.label));
+      const rm = el("button", "rm", "×");
+      rm.setAttribute("aria-label", "Show again");
+      rm.onclick = () => this.act(() => send(`/api/mutes/${m.id}`, "DELETE"));
+      row.append(rm);
+      ml.append(row);
+    }
+
     const lr = this.data.last_refresh;
     $("#lastRefresh").textContent = lr
       ? `Stories last checked ${ago(lr)} ago · checks every ${this.data.refresh_minutes} min`

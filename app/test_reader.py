@@ -156,6 +156,46 @@ def test_go_page_forwards_only_to_web_addresses():
     assert evil.count("<script>") == 1 and "\\u003c/script" in evil
 
 
+def test_fewer_like_this_mutes():
+    db = server.db
+    watches = db.get_or_create_section("WatchesT")
+    cars = db.get_or_create_section("CarsT")
+    f_rolex, _ = db.add_feed("https://flipboard.com/topic/rolexT.rss", watches, "Flipboard: Rolex")
+    f_cars, _ = db.add_feed("https://cars.example/feed", cars, "Cars")
+    now = time.time()
+    mk = lambda fid, i, url: dict(feed_id=fid, guid=f"m{fid}-{i}", url=url, norm_url=url, title=f"S{fid}-{i}", summary="",
+                                  image=None, author=None, source="S", published=now - i)
+    db.upsert_article(mk(f_rolex, 1, "https://essentiallysports.com/sinner"), [("rolex", "Rolex"), ("tennis", "Tennis")])
+    db.upsert_article(mk(f_rolex, 2, "https://hodinkee.example/datejust"), [("rolex", "Rolex")])
+    db.upsert_article(mk(f_cars, 3, "https://essentiallysports.com/f1"), [("f1", "F1")])
+
+    c = client()
+    titles = lambda sid: [s["title"] for s in c.get(f"/api/section/{sid}").get_json()["stories"]]
+    assert titles(watches) == [f"S{f_rolex}-1", f"S{f_rolex}-2"]
+    story = c.get(f"/api/section/{watches}").get_json()["stories"][0]
+    assert story["domain"] == "essentiallysports.com" and story["section_name"] == "WatchesT"
+    assert {t["slug"] for t in story["tags"]} == {"rolex", "tennis"}
+
+    # hide "Tennis" in Watches only: the Watches story goes, the cars story (different section) stays
+    r = c.post("/api/mutes", json={"section_id": watches, "kind": "tag", "value": "tennis", "label": "#Tennis in WatchesT"})
+    assert r.status_code == 200
+    assert titles(watches) == [f"S{f_rolex}-2"]
+    assert titles(cars) == [f"S{f_cars}-3"]
+    # ...and it's gone from For You too
+    assert f"S{f_rolex}-1" not in [s["title"] for s in c.get("/api/section/foryou").get_json()["stories"]]
+
+    # hide the site everywhere: cars story goes as well
+    c.post("/api/mutes", json={"section_id": None, "kind": "domain", "value": "essentiallysports.com", "label": "x"})
+    assert titles(cars) == []
+
+    mutes = c.get("/api/settings").get_json()["mutes"]
+    assert len(mutes) == 2 and mutes[0]["label"] == "x"
+    for m in mutes:
+        assert c.delete(f"/api/mutes/{m['id']}").status_code == 200
+    assert titles(watches) == [f"S{f_rolex}-1", f"S{f_rolex}-2"]
+    assert c.post("/api/mutes", json={"kind": "nope", "value": "x"}).status_code == 400
+
+
 def test_duplicate_section_names_are_refused():
     c = client()
     assert c.post("/api/sections", json={"name": "Alpha"}).status_code == 200

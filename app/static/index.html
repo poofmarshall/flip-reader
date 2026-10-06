@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#111111">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/style.css?v=6">
 <title>Flip Reader</title>
 </head>
 <body>
@@ -82,6 +82,12 @@
       <p id="importStatus" class="status"></p>
     </div>
 
+    <div class="card-box" id="hiddenBox" hidden>
+      <h3>Hidden</h3>
+      <p class="help">Things you asked to see less of, via the ··· button on a story. Tap × to bring one back.</p>
+      <div id="muteList"></div>
+    </div>
+
     <h3 class="list-head">Your sections</h3>
     <p id="listStatus" class="status err"></p>
     <div id="sectionList"></div>
@@ -89,6 +95,6 @@
   </div>
 </section>
 
-<script src="/static/app.js?v=5"></script>
+<script src="/static/app.js?v=6"></script>
 </body>
 </html>

@@ -85,12 +85,35 @@ def login():
 
 # ---------- story mixing ----------
 
-def _shape(a):
+def _shape(a, tags=(), section_names=None):
     return {
         "id": a["id"], "url": a["url"], "title": a["title"], "summary": a["summary"] or "",
         "image": a["image"], "source": a["source"] or a.get("feed_title") or domain_of(a["url"]),
         "author": a["author"], "published": a["published"], "section_id": a.get("section_id"),
+        "section_name": (section_names or {}).get(a.get("section_id"), ""),
+        "domain": domain_of(a["url"]),
+        "tags": [{"slug": s, "name": n} for s, n in tags],
     }
+
+
+def apply_mutes(arts, mutes):
+    """Drop stories the user asked to see less of. A mute scoped to a section applies to
+    stories from that section's feeds wherever they appear (including For You)."""
+    if not mutes:
+        return arts
+    tag_mutes = [(m["section_id"], m["value"]) for m in mutes if m["kind"] == "tag"]
+    dom_mutes = [(m["section_id"], m["value"]) for m in mutes if m["kind"] == "domain"]
+    tags = db.tags_for([a["id"] for a in arts]) if tag_mutes else {}
+    out = []
+    for a in arts:
+        sid, dom = a.get("section_id"), domain_of(a["url"])
+        if any((ms is None or ms == sid) and dom == v for ms, v in dom_mutes):
+            continue
+        slugs = {s for s, _ in tags.get(a["id"], ())}
+        if any((ms is None or ms == sid) and v in slugs for ms, v in tag_mutes):
+            continue
+        out.append(a)
+    return out
 
 
 def mix(articles, limit, exclude_urls=(), exclude_domains=()):
@@ -130,10 +153,11 @@ def _followed():
 
 def section_stories(sid):
     secs, mine, disc = _split_sections()
+    mutes = db.mutes()
     if sid == "foryou":
-        own = mix(db.section_articles(mine, 2000), FOR_YOU_SIZE)
+        own = mix(apply_mutes(db.section_articles(mine, 2000), mutes), FOR_YOU_SIZE)
         urls, domains = _followed()
-        fresh = mix(db.section_articles(disc, 1000), FOR_YOU_SIZE // 4, urls, domains)
+        fresh = mix(apply_mutes(db.section_articles(disc, 1000), mutes), FOR_YOU_SIZE // 4, urls, domains)
         out = []
         # every 4th story is a Discover pick
         while own or fresh:
@@ -146,7 +170,7 @@ def section_stories(sid):
     sec = next((s for s in secs if s["id"] == sid), None)
     if not sec:
         return None, []
-    raw = db.section_articles([sid], 1500)
+    raw = apply_mutes(db.section_articles([sid], 1500), mutes)
     if sec["discover"]:
         urls, domains = _followed()
         return sec["name"], mix(raw, SECTION_SIZE, urls, domains)
@@ -179,7 +203,35 @@ def section(sid):
     name, stories = section_stories(key) if key is not None else (None, [])
     if name is None:
         return jsonify(error="section not found"), 404
-    return jsonify(name=name, stories=[_shape(a) for a in stories])
+    tags = db.tags_for([a["id"] for a in stories])
+    names = {s["id"]: s["name"] for s in db.sections()}
+    return jsonify(name=name, stories=[_shape(a, tags.get(a["id"], ()), names) for a in stories])
+
+
+# ---------- "fewer like this" ----------
+
+@app.get("/api/mutes")
+def list_mutes():
+    return jsonify(mutes=db.mutes())
+
+
+@app.post("/api/mutes")
+def add_mute():
+    body = request.get_json(force=True, silent=True) or {}
+    kind, value, label = body.get("kind"), (body.get("value") or "").strip().lower(), (body.get("label") or "").strip()
+    sid = body.get("section_id")
+    if kind not in ("tag", "domain") or not value:
+        return jsonify(error="Nothing to hide."), 400
+    if sid is not None and not any(s["id"] == sid for s in db.sections()):
+        return jsonify(error="That section no longer exists."), 400
+    db.add_mute(sid, kind, value, label or value)
+    return jsonify(ok=True)
+
+
+@app.delete("/api/mutes/<int:mid>")
+def delete_mute(mid):
+    db.delete_mute(mid)
+    return jsonify(ok=True)
 
 
 # ---------- settings API ----------
@@ -191,7 +243,7 @@ def settings():
         out.append({**s, "discover": bool(s["discover"]), "feeds": [
             {"id": f["id"], "url": f["url"], "title": f["title"] or f["url"],
              "last_ok": f["last_ok"], "last_error": f["last_error"]} for f in db.feeds(s["id"])]})
-    return jsonify(sections=out, last_refresh=fetcher.last_run, refresh_minutes=REFRESH_MINUTES)
+    return jsonify(sections=out, mutes=db.mutes(), last_refresh=fetcher.last_run, refresh_minutes=REFRESH_MINUTES)
 
 
 @app.post("/api/sections")
