@@ -1,5 +1,8 @@
 "use strict";
 
+// the version baked into this script's URL by the server; compared with what the server reports
+const APP_VERSION = (() => { try { return new URL(document.currentScript.src).searchParams.get("v"); } catch (_) { return null; } })();
+
 const $ = (s, el = document) => el.querySelector(s);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -63,6 +66,12 @@ const Home = {
     let data;
     try { data = await api("/api/home"); }
     catch (e) { box.replaceChildren(el("div", "empty", e.message)); return; }
+    if (data.version && APP_VERSION && data.version !== APP_VERSION && !sessionStorage.getItem("reloaded:" + data.version)) {
+      // a newer app is on the server: fetch it (once per version, so a mismatch can't loop)
+      try { sessionStorage.setItem("reloaded:" + data.version, "1"); } catch (_) {}
+      location.reload();
+      return;
+    }
     box.replaceChildren();
     for (const t of data.tiles) {
       if (!t.count && t.id !== "foryou") continue; // empty sections live in Settings only
@@ -633,4 +642,10 @@ $("#settingsBack").onclick = () => { location.hash = "#/"; };
 
 /* ========================================================= */
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+// coming back to the app after a while: refresh the home grid (which also picks up new versions)
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (Date.now() - hiddenAt > 5 * 60 * 1000 && !views.home.hidden) Home.load();
+});
 route();

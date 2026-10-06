@@ -1,6 +1,6 @@
 // Keeps the app shell available offline; stories always come fresh from the server.
-const CACHE = "flip-reader-v6";
-const SHELL = ["/", "/static/style.css?v=6", "/static/app.js?v=6", "/apple-touch-icon.png"];
+const CACHE = "flip-reader-__V__";
+const SHELL = ["/", "/static/style.css?v=__V__", "/static/app.js?v=__V__", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));

@@ -196,6 +196,19 @@ def test_fewer_like_this_mutes():
     assert c.post("/api/mutes", json={"kind": "nope", "value": "x"}).status_code == 400
 
 
+def test_asset_version_is_baked_in_and_reported():
+    c = client()
+    v = server.ASSET_VERSION
+    assert len(v) == 8
+    page = c.get("/").get_data(as_text=True)
+    assert f"app.js?v={v}" in page and f"style.css?v={v}" in page and "__V__" not in page
+    sw = c.get("/sw.js")
+    assert sw.mimetype == "application/javascript" and f"flip-reader-{v}" in sw.get_data(as_text=True)
+    assert c.get("/api/home").get_json()["version"] == v
+    login = server.app.test_client().get("/login").get_data(as_text=True)
+    assert f"style.css?v={v}" in login
+
+
 def test_duplicate_section_names_are_refused():
     c = client()
     assert c.post("/api/sections", json={"name": "Alpha"}).status_code == 200

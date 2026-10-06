@@ -20,6 +20,27 @@ APP_TOKEN = os.environ.get("APP_TOKEN", "").strip()
 REFRESH_MINUTES = int(os.environ.get("REFRESH_MINUTES", "20"))
 STATIC = os.path.join(os.path.dirname(__file__), "static")
 
+
+def _asset_version():
+    """Fingerprint of the front-end files. Baked into the page's script/style URLs and reported
+    by /api/home, so a phone holding an old copy notices and reloads itself."""
+    import hashlib
+    h = hashlib.md5()
+    for name in ("app.js", "style.css", "sw.js", "index.html", "login.html"):
+        with open(os.path.join(STATIC, name), "rb") as f:
+            h.update(f.read())
+    return h.hexdigest()[:8]
+
+
+ASSET_VERSION = _asset_version()
+
+
+def _templated(name, mimetype="text/html"):
+    """Serve a static file with __V__ replaced by the asset fingerprint, never cached."""
+    with open(os.path.join(STATIC, name), encoding="utf-8") as f:
+        body = f.read().replace("__V__", ASSET_VERSION)
+    return body, 200, {"Content-Type": f"{mimetype}; charset=utf-8", "Cache-Control": "no-cache"}
+
 # Aggregators: their domain says nothing about which *source* you follow.
 AGGREGATOR_DOMAINS = {"news.google.com", "flipboard.com", "feedproxy.google.com", "feeds.feedburner.com"}
 SAME_FEED_PENALTY = 3 * 3600   # each extra story from one feed counts as 3h older
@@ -79,8 +100,9 @@ def login():
             resp.set_cookie("fr_token", APP_TOKEN, max_age=400 * 86400, httponly=True, samesite="Lax",
                             secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
             return resp
-        return send_from_directory(STATIC, "login.html"), 401
-    return send_from_directory(STATIC, "login.html")
+        body, _, headers = _templated("login.html")
+        return body, 401, headers
+    return _templated("login.html")
 
 
 # ---------- story mixing ----------
@@ -188,7 +210,7 @@ def home():
     for s in secs:
         _, st = section_stories(s["id"])
         tiles.append(_tile(s["id"], s["name"], st, bool(s["discover"])))
-    return jsonify(tiles=tiles, last_refresh=fetcher.last_run)
+    return jsonify(tiles=tiles, last_refresh=fetcher.last_run, version=ASSET_VERSION)
 
 
 def _tile(sid, name, stories, discover):
@@ -445,16 +467,12 @@ def go():
 
 @app.get("/")
 def index():
-    resp = send_from_directory(STATIC, "index.html")
-    resp.headers["Cache-Control"] = "no-cache"
-    return resp
+    return _templated("index.html")
 
 
 @app.get("/sw.js")
 def sw():
-    resp = send_from_directory(STATIC, "sw.js")
-    resp.headers["Cache-Control"] = "no-cache"
-    return resp
+    return _templated("sw.js", "application/javascript")
 
 
 @app.get("/manifest.webmanifest")
