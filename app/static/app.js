@@ -33,7 +33,8 @@ function ago(ts) {
 }
 
 function openStory(story) {
-  window.open(story.url, "_blank", "noopener");
+  // via /go so iOS doesn't hand the link to a native app (see server.py)
+  window.open("/go?u=" + encodeURIComponent(story.url), "_blank", "noopener");
 }
 
 /* =========================================================

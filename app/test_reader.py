@@ -142,6 +142,20 @@ def test_topic_suggestions():
     assert c.get("/api/suggestions").get_json()["suggestions"] == []
 
 
+def test_go_page_forwards_only_to_web_addresses():
+    from urllib.parse import quote
+    c = server.app.test_client()  # /go is open: it carries no data of ours
+    r = c.get("/go?u=" + quote('https://www.espn.com/tennis/story?id=1&x="y"', safe=""))
+    assert r.status_code == 200 and "no-store" in r.headers["Cache-Control"]
+    body = r.get_data(as_text=True)
+    assert 'location.replace("https://www.espn.com/tennis/story?id=1\\u0026x=\\"y\\"")' in body
+    assert "</script>" in body and "<script>" in body.split("location.replace")[0]
+    assert c.get("/go?u=javascript:alert(1)").status_code == 400
+    assert c.get("/go").status_code == 400
+    evil = c.get("/go?u=" + quote("https://a.example/</script><script>evil()</script>", safe="")).get_data(as_text=True)
+    assert evil.count("<script>") == 1 and "\\u003c/script" in evil
+
+
 def test_duplicate_section_names_are_refused():
     c = client()
     assert c.post("/api/sections", json={"name": "Alpha"}).status_code == 200

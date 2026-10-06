@@ -62,7 +62,7 @@ def _authed():
 
 @app.before_request
 def gate():
-    open_paths = ("/login", "/manifest.webmanifest", "/static/icon", "/static/style.css", "/apple-touch-icon", "/api/health")
+    open_paths = ("/login", "/manifest.webmanifest", "/static/icon", "/static/style.css", "/apple-touch-icon", "/api/health", "/go")
     if any(request.path.startswith(p) for p in open_paths) or _authed():
         return None
     if request.path.startswith("/api/"):
@@ -367,6 +367,29 @@ def health():
 
 
 # ---------- the app shell ----------
+
+GO_PAGE = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<meta name="referrer" content="no-referrer"><title>Opening…</title>
+<style>body{{font-family:-apple-system,sans-serif;padding:40px 20px;text-align:center;color:#666}}a{{color:#e12828}}</style>
+<script>location.replace({url_js});</script></head>
+<body><p>Opening the story…</p><p><a href="{url_html}">Tap here if it doesn't open</a></p></body></html>"""
+
+
+@app.get("/go")
+def go():
+    """Forward to an article from a page of our own. iOS only hands a link to a native app
+    (ESPN, NYT, YouTube…) when the user tapped it directly; a page that forwards doesn't count,
+    so stories stay in the browser instead of being hijacked by some app's deep link."""
+    import json
+    from markupsafe import escape
+    url = (request.args.get("u") or "").strip()
+    if not re.match(r"^https?://", url, re.I):
+        return "Not a web address", 400
+    # json.dumps leaves < > & alone; escape them so a crafted URL can't break out of the <script>
+    url_js = json.dumps(url).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return GO_PAGE.format(url_js=url_js, url_html=escape(url)), 200, {
+        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
+
 
 @app.get("/")
 def index():

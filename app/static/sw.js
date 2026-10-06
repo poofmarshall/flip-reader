@@ -1,6 +1,6 @@
 // Keeps the app shell available offline; stories always come fresh from the server.
-const CACHE = "flip-reader-v4";
-const SHELL = ["/", "/static/style.css?v=4", "/static/app.js?v=4", "/apple-touch-icon.png"];
+const CACHE = "flip-reader-v5";
+const SHELL = ["/", "/static/style.css?v=5", "/static/app.js?v=5", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
@@ -12,7 +12,7 @@ self.addEventListener("activate", (e) => {
 });
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || url.pathname === "/login") return;
+  if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || url.pathname === "/login" || url.pathname === "/go") return;
   // network first, fall back to cache when offline
   e.respondWith(
     fetch(e.request)
