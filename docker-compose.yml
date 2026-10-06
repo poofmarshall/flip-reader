@@ -1,0 +1,27 @@
+services:
+  flip-reader:
+    # Built automatically from the GitHub repo on every change (see .github/workflows/build.yml).
+    # To build locally from this folder instead, comment out `image:` and uncomment `build: .`
+    image: ghcr.io/OWNER/flip-reader:latest
+    # build: .
+    container_name: flip-reader
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090"   # cloudflared on the same host points at this
+    volumes:
+      - ./data:/data            # the story database — keep it between updates
+    environment:
+      APP_TOKEN: "${APP_TOKEN}"             # Chris's access code (from .env)
+      REFRESH_MINUTES: "${REFRESH_MINUTES:-20}"
+      LOG_LEVEL: INFO
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"   # let Watchtower auto-update this one
+
+  # Uncomment if Watchtower isn't already running on this host.
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   container_name: watchtower
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: --label-enable --cleanup --interval 1800

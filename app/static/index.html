@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Flip Reader">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/style.css?v=4">
+<title>Flip Reader</title>
+</head>
+<body>
+
+<!-- Sections grid -->
+<section id="home" class="view">
+  <header class="bar">
+    <h1 class="brand"><span class="mark">F</span> Flip Reader</h1>
+    <div class="bar-actions">
+      <button id="refreshBtn" class="icon-btn" aria-label="Refresh">↻</button>
+      <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙︎</button>
+    </div>
+  </header>
+  <div id="refreshNote" class="note" hidden></div>
+  <div id="tiles" class="tiles"></div>
+</section>
+
+<!-- Flip reader -->
+<section id="reader" class="view" hidden>
+  <header class="bar reader-bar">
+    <button id="backBtn" class="icon-btn back" aria-label="Back to sections">‹</button>
+    <h2 id="readerTitle"></h2>
+    <span id="pageNum" class="page-num"></span>
+  </header>
+  <div id="stage" class="stage"></div>
+  <div id="flipHint" class="flip-hint" hidden>Swipe up to flip</div>
+</section>
+
+<!-- Settings -->
+<section id="settings" class="view" hidden>
+  <header class="bar">
+    <button id="settingsBack" class="icon-btn back" aria-label="Back">‹</button>
+    <h2>Settings</h2>
+    <span></span>
+  </header>
+  <div class="settings-body">
+
+    <div class="card-box">
+      <h3>Add stories</h3>
+      <label>What are you adding?
+        <select id="addKind">
+          <option value="url">A website, feed, or Flipboard magazine link</option>
+          <option value="flipboard">A Flipboard topic (e.g. "golf")</option>
+          <option value="google">A Google News search (e.g. "Lions football")</option>
+        </select>
+      </label>
+      <label>Put it in section
+        <select id="addSection"></select>
+      </label>
+      <input id="addValue" type="text" autocomplete="off" autocapitalize="off" placeholder="Paste a link or type a topic">
+      <button id="addBtn" class="primary">Add</button>
+      <p id="addStatus" class="status"></p>
+    </div>
+
+    <div class="card-box">
+      <h3>New section</h3>
+      <input id="newSection" type="text" placeholder="Section name, e.g. Sports">
+      <label class="check"><input id="newSectionDiscover" type="checkbox"> Discover section (shows only sources you don't already follow)</label>
+      <button id="newSectionBtn">Create section</button>
+      <p id="newSectionStatus" class="status"></p>
+    </div>
+
+    <div class="card-box">
+      <h3>Import from NewsBlur</h3>
+      <p class="help">While signed in to NewsBlur, open <b>newsblur.com/import/opml_export</b> — it downloads your list of sites. Then choose that file here. Your NewsBlur folders become sections. (On iPhone the file lands in Files → Downloads.)</p>
+      <input id="opmlFile" type="file" accept=".opml,.xml,text/xml,application/xml">
+      <button id="importBtn">Import</button>
+      <p id="importStatus" class="status"></p>
+    </div>
+
+    <h3 class="list-head">Your sections</h3>
+    <p id="listStatus" class="status err"></p>
+    <div id="sectionList"></div>
+    <p id="lastRefresh" class="help center"></p>
+  </div>
+</section>
+
+<script src="/static/app.js?v=4"></script>
+</body>
+</html>

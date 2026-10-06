@@ -1,0 +1,10 @@
+# never upload these
+data/
+.env
+my-feeds.opml
+
+# python / editor junk
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
