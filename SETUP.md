@@ -10,10 +10,10 @@ Cloudflare Tunnel.
 
 ## 1. Run it
 
-The container is built automatically from Chris's GitHub repo and published as
-`ghcr.io/<chris's-github-name>/flip-reader:latest` (the exact name is in
-`docker-compose.yml`). You only need the `docker-compose.yml` and `.env` from this
-folder — no source, no build step.
+The container is built automatically from Chris's GitHub repo
+(https://github.com/poofmarshall/flip-reader) and published as the public image
+`ghcr.io/poofmarshall/flip-reader:latest`. You only need `docker-compose.yml` and
+`.env` from this folder — no source, no build step, no registry login.
 
 ```bash
 cp .env.example .env         # put Chris's APP_TOKEN in here (he'll send it)
@@ -23,12 +23,9 @@ docker compose logs -f       # first line should be "refreshed N feeds, M new ar
 curl -s http://127.0.0.1:8090/api/health
 ```
 
-If `pull` is refused, the package on GitHub is still private — Chris flips it to
-public under the repo's Packages settings (or sends you a read-only token).
-
-The container listens on `127.0.0.1:8090`. `./data/` holds `reader.db` — his feed list
-and story cache. **Keep it between rebuilds** (it's a bind mount, so `docker compose up
---build` preserves it). Losing it only means he re-imports his feed list; no big deal.
+The container listens on `127.0.0.1:8090`. `./data/` holds `reader.db` — his feed list,
+story cache and settings. **Keep it between updates** (it's a bind mount, so updates
+preserve it). Losing it only means he re-imports his feed list; no big deal.
 
 ## 2. Cloudflare Tunnel
 
@@ -51,10 +48,11 @@ hostname from inside the authenticated page.
 
 ## 3. Resource use
 
-Fetches every `REFRESH_MINUTES` (default 20). ~15 feeds → a few hundred KB per refresh,
-plus up to 60 article-page peeks per run to find pictures for stories that don't ship
-one. Memory ~80 MB. Stories older than 10 days or beyond 150 per feed are pruned
-automatically, so the database stays small (tens of MB).
+Fetches every `REFRESH_MINUTES` (default 20). ~130 feeds → roughly 5 MB per refresh
+(a full pass takes about 90 s), plus up to 60 article-page peeks per run to find
+pictures for stories that don't ship one. Memory ~100 MB. Stories older than 10 days
+or beyond 150 per feed are pruned automatically, so the database stays small (tens of
+MB). One hung website can't stall a refresh: each pass has an overall time cap.
 
 ## 4. Updating
 
